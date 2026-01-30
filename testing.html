@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm Tra Chuột</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #09090b; /* Màu nền cực tối */
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: crosshair; /* Con trỏ mảnh mai hơn */
+        }
+
+        /* Hiệu ứng phát sáng mạnh khi click */
+        .active-btn {
+            fill: #60a5fa !important;
+            filter: drop-shadow(0 0 20px #3b82f6);
+            transition: fill 0.05s ease;
+        }
+
+        /* Chữ trạng thái mờ dần */
+        .fade-out {
+            animation: fadeEffect 1.5s forwards;
+        }
+        @keyframes fadeEffect {
+            0% { opacity: 1; transform: translateY(0); }
+            20% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center font-mono text-gray-500 overflow-hidden">
+
+    <!-- Dòng thông báo trạng thái duy nhất (Hiện rồi tự tắt) -->
+    <div id="status-text" class="h-8 text-xl text-blue-400 font-light tracking-widest mb-10"></div>
+
+    <!-- Hình ảnh chuột trung tâm -->
+    <div class="relative w-64 h-auto mb-12">
+        <svg viewBox="0 0 200 300" class="w-full drop-shadow-2xl">
+            <!-- Thân chuột -->
+            <path d="M50 150 V220 C50 270 150 270 150 220 V150 H50 Z" fill="#18181b" stroke="#27272a" stroke-width="2"/>
+            
+            <!-- Nút Trái -->
+            <path id="btn-left" d="M50 80 C50 40 100 40 100 40 V140 H50 V80 Z" fill="#27272a" stroke="#18181b" stroke-width="2"/>
+            
+            <!-- Nút Phải -->
+            <path id="btn-right" d="M100 40 C100 40 150 40 150 80 V140 H100 V40 Z" fill="#27272a" stroke="#18181b" stroke-width="2"/>
+            
+            <!-- Nút Giữa -->
+            <rect id="btn-middle" x="92" y="55" width="16" height="40" rx="5" fill="#18181b" stroke="#000" stroke-width="1"/>
+            
+            <!-- Nút Hông -->
+            <path id="btn-forward" d="M45 160 H55 V180 H45 C35 180 35 160 45 160 Z" fill="#27272a" stroke="#18181b" stroke-width="1"/>
+            <path id="btn-back" d="M45 190 H55 V210 H45 C35 210 35 190 45 190 Z" fill="#27272a" stroke="#18181b" stroke-width="1"/>
+
+            <!-- Mũi tên cuộn (ẩn mặc định) -->
+            <path id="scroll-up" d="M95 30 L100 20 L105 30" stroke="#3b82f6" stroke-width="3" fill="none" class="opacity-0 transition-opacity"/>
+            <path id="scroll-down" d="M95 110 L100 120 L105 110" stroke="#3b82f6" stroke-width="3" fill="none" class="opacity-0 transition-opacity"/>
+        </svg>
+    </div>
+
+    <!-- Bộ đếm số đơn giản -->
+    <div class="flex gap-16 text-center">
+        <div>
+            <div id="count-left" class="text-4xl text-white font-thin">0</div>
+            <div class="text-xs mt-2 opacity-30">LEFT</div>
+        </div>
+        <div>
+            <div id="count-middle" class="text-4xl text-white font-thin">0</div>
+            <div class="text-xs mt-2 opacity-30">MIDDLE</div>
+        </div>
+        <div>
+            <div id="count-right" class="text-4xl text-white font-thin">0</div>
+            <div class="text-xs mt-2 opacity-30">RIGHT</div>
+        </div>
+    </div>
+
+    <!-- Tọa độ góc nhỏ xíu -->
+    <div class="fixed bottom-5 right-5 text-xs opacity-20">
+        X: <span id="pos-x">0</span> Y: <span id="pos-y">0</span>
+    </div>
+
+    <script>
+        // Elements
+        const statusText = document.getElementById('status-text');
+        const counters = {
+            0: document.getElementById('count-left'),
+            1: document.getElementById('count-middle'),
+            2: document.getElementById('count-right')
+        };
+        const buttons = {
+            0: document.getElementById('btn-left'),
+            1: document.getElementById('btn-middle'),
+            2: document.getElementById('btn-right'),
+            3: document.getElementById('btn-back'),
+            4: document.getElementById('btn-forward')
+        };
+        const scrollUp = document.getElementById('scroll-up');
+        const scrollDown = document.getElementById('scroll-down');
+        
+        let counts = { 0: 0, 1: 0, 2: 0 };
+        let scrollTimer;
+        let lastClickTime = 0;
+
+        // Hàm hiện thông báo ngắn gọn
+        function showStatus(text) {
+            statusText.innerText = text;
+            statusText.classList.remove('fade-out');
+            void statusText.offsetWidth; // Trigger reflow
+            statusText.classList.add('fade-out');
+        }
+
+        // Chặn menu chuột phải
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Xử lý Click
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 3 || e.button === 4) e.preventDefault();
+
+            // Hiệu ứng Visual
+            if (buttons[e.button]) buttons[e.button].classList.add('active-btn');
+
+            // Tăng bộ đếm (chỉ cho 3 nút chính)
+            if (counts[e.button] !== undefined) {
+                counts[e.button]++;
+                counters[e.button].innerText = counts[e.button];
+            }
+
+            // Tên nút
+            let name = "CLICK";
+            if (e.button === 0) name = "LEFT CLICK";
+            if (e.button === 1) name = "MIDDLE CLICK";
+            if (e.button === 2) name = "RIGHT CLICK";
+            if (e.button === 3) name = "BACK";
+            if (e.button === 4) name = "FORWARD";
+
+            // Kiểm tra Double Click đơn giản
+            const now = new Date().getTime();
+            if (now - lastClickTime < 300) {
+                showStatus("DOUBLE CLICK!");
+                statusText.style.color = "#ec4899"; // Màu hồng cho double click
+            } else {
+                showStatus(name);
+                statusText.style.color = "#60a5fa"; // Màu xanh cho click thường
+            }
+            lastClickTime = now;
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (buttons[e.button]) buttons[e.button].classList.remove('active-btn');
+            // Fix riêng cho nút giữa nếu bị kẹt
+            if (e.button === 1) buttons[1].classList.remove('active-btn');
+        });
+
+        // Xử lý Cuộn
+        document.addEventListener('wheel', (e) => {
+            clearTimeout(scrollTimer);
+            if (e.deltaY < 0) {
+                scrollUp.style.opacity = 1;
+                scrollDown.style.opacity = 0;
+                showStatus("SCROLL UP");
+            } else {
+                scrollUp.style.opacity = 0;
+                scrollDown.style.opacity = 1;
+                showStatus("SCROLL DOWN");
+            }
+            statusText.style.color = "#facc15"; // Màu vàng cho scroll
+
+            scrollTimer = setTimeout(() => {
+                scrollUp.style.opacity = 0;
+                scrollDown.style.opacity = 0;
+            }, 150);
+        }, { passive: true });
+
+        // Tọa độ
+        document.addEventListener('mousemove', (e) => {
+            document.getElementById('pos-x').innerText = e.clientX;
+            document.getElementById('pos-y').innerText = e.clientY;
+        });
+    </script>
+</body>
+</html>
